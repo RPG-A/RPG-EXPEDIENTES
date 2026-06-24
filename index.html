@@ -2753,7 +2753,11 @@ async function showViewer(){
   try{
     var res=await sb.from(TABLE).select('data,imgs,updated_at,updated_by').eq('exp_id',EXP_ID).maybeSingle();
     if(res.data){
-      applyData({data:res.data.data||{}, imgs:res.data.imgs||[]});
+      var pay={data:res.data.data||{}, imgs:res.data.imgs||[]};
+      applyData(pay);
+      // refuerzo: re-aplicar por si algo del arranque pisó los campos
+      setTimeout(function(){ try{ applyData(pay); }catch(e){} }, 600);
+      setTimeout(function(){ try{ applyData(pay); }catch(e){} }, 1500);
       iso=res.data.updated_at; by=res.data.updated_by||''; found=true;
     }
   }catch(e){ console.error(e); }
@@ -2780,7 +2784,7 @@ function buildViewerBar(iso, by, found){
     +'border-radius:30px;font:600 13px system-ui;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:94vw;';
   var meta = found ? ('Actualizado '+relTime(iso)+(by?(' · '+by.split('@')[0]):'')) : 'Sin datos aún';
   bar.innerHTML=
-    '<span>👁 Solo lectura</span>'
+    '<span>👁 Solo lectura · v2</span>'
     +'<span style="font-weight:400;color:#94a3b8;">'+meta+'</span>'
     +'<button onclick="location.reload()" style="background:#2563eb;color:#fff;border:0;border-radius:6px;padding:6px 11px;cursor:pointer;font:600 12px system-ui;">↻</button>'
     +(userEmail
