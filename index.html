@@ -3,7 +3,7 @@
 <html lang="es"><head>
 <meta content="text/html; charset=utf-8" http-equiv="content-type"/>
 <meta charset="utf-8"/>
-<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="width=1024" name="viewport"/>
 <title> </title>
 <style>
 /* Topbar */
@@ -2747,39 +2747,46 @@ function wireAutosave(){
   });
 }
 
-/* ---------- Vista de solo lectura ---------- */
+/* ---------- Vista de solo lectura (expediente real, navegable) ---------- */
 async function showViewer(){
-  var html='', iso='', by='';
+  var iso='', by='', found=false;
   try{
-    var res=await sb.from(TABLE).select('html,updated_at,updated_by').eq('exp_id',EXP_ID).maybeSingle();
-    if(res.data){ html=res.data.html||''; iso=res.data.updated_at; by=res.data.updated_by||''; }
+    var res=await sb.from(TABLE).select('data,imgs,updated_at,updated_by').eq('exp_id',EXP_ID).maybeSingle();
+    if(res.data){
+      applyData({data:res.data.data||{}, imgs:res.data.imgs||[]});
+      iso=res.data.updated_at; by=res.data.updated_by||''; found=true;
+    }
   }catch(e){ console.error(e); }
-  document.documentElement.style.overflow='hidden';
-  document.body.innerHTML=
-    '<div style="position:fixed;top:0;left:0;right:0;height:46px;background:#0f172a;color:#fff;display:flex;'
-    +'align-items:center;gap:12px;padding:0 14px;z-index:99999;font:600 13px system-ui;">'
-    +'<span>👁 Solo lectura — '+EXP_ID+'</span>'
-    +'<span id="v-meta" style="font-weight:400;color:#94a3b8;font-size:12px;"></span>'
-    +'<button onclick="viewerRefresh()" style="margin-left:auto;background:#2563eb;color:#fff;border:0;border-radius:6px;padding:7px 13px;cursor:pointer;font:600 12px system-ui;">↻ Actualizar</button>'
+  makeReadOnly();
+  buildViewerBar(iso, by, found);
+}
+function makeReadOnly(){
+  // Desactivar edición de texto (se sigue viendo y se navega por pestañas)
+  document.querySelectorAll('[contenteditable]').forEach(function(el){ el.setAttribute('contenteditable','false'); });
+  // Bloquear controles de edición pero dejar pestañas, albarán e impresión
+  var css=document.createElement('style');
+  css.textContent=
+    '.sn-opt,.badge,.img-del,.img-add,[onclick*="addRowToSection"],[onclick*="removeRow"],'
+    +'[onclick*="addInspection"],[onclick*="delImg"],[onclick*="addImg"],#btn-cloud-save,'
+    +'.topbar-btns .btn-ghost{pointer-events:none !important;opacity:.55;}'
+    +'.tab,.btn-blue,[onclick*="openAlb"],[onclick*="window.print"]{pointer-events:auto !important;opacity:1 !important;}';
+  document.head.appendChild(css);
+}
+function buildViewerBar(iso, by, found){
+  var bar=document.createElement('div');
+  bar.id='viewer-bar';
+  bar.style.cssText='position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:99999;'
+    +'background:#0f172a;color:#fff;display:flex;align-items:center;gap:10px;padding:8px 14px;'
+    +'border-radius:30px;font:600 13px system-ui;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:94vw;';
+  var meta = found ? ('Actualizado '+relTime(iso)+(by?(' · '+by.split('@')[0]):'')) : 'Sin datos aún';
+  bar.innerHTML=
+    '<span>👁 Solo lectura</span>'
+    +'<span style="font-weight:400;color:#94a3b8;">'+meta+'</span>'
+    +'<button onclick="location.reload()" style="background:#2563eb;color:#fff;border:0;border-radius:6px;padding:6px 11px;cursor:pointer;font:600 12px system-ui;">↻</button>'
     +(userEmail
-       ? '<button onclick="cloudLogout()" style="background:#334155;color:#fff;border:0;border-radius:6px;padding:7px 13px;cursor:pointer;font:600 12px system-ui;">Salir</button>'
-       : '<button onclick="showLogin()" style="background:#00A86B;color:#fff;border:0;border-radius:6px;padding:7px 13px;cursor:pointer;font:600 12px system-ui;">Entrar para editar</button>')
-    +'</div>'
-    +'<iframe id="v-frame" sandbox="" style="position:fixed;top:46px;left:0;right:0;bottom:0;width:100%;border:0;background:#fff;"></iframe>';
-  setViewerContent(html, iso, by);
-  setInterval(viewerRefresh, 20000);
-}
-function setViewerContent(html, iso, by){
-  var f=document.getElementById('v-frame');
-  if(f){ if(html){ f.srcdoc=html; } else { f.srcdoc='<body style="font:15px system-ui;padding:40px;color:#64748b">Este expediente aún no tiene una versión guardada en la nube.</body>'; } }
-  var m=document.getElementById('v-meta');
-  if(m) m.textContent = iso ? ('Última actualización '+relTime(iso)+(by?(' por '+by.split('@')[0]):'')) : '';
-}
-async function viewerRefresh(){
-  try{
-    var res=await sb.from(TABLE).select('html,updated_at,updated_by').eq('exp_id',EXP_ID).maybeSingle();
-    if(res.data) setViewerContent(res.data.html||'', res.data.updated_at, res.data.updated_by||'');
-  }catch(e){ console.error(e); }
+       ? '<button onclick="cloudLogout()" style="background:#334155;color:#fff;border:0;border-radius:6px;padding:6px 11px;cursor:pointer;font:600 12px system-ui;">Salir</button>'
+       : '<button onclick="showLogin()" style="background:#00A86B;color:#fff;border:0;border-radius:6px;padding:6px 11px;cursor:pointer;font:600 12px system-ui;">Entrar para editar</button>');
+  document.body.appendChild(bar);
 }
 
 /* ---------- Login ---------- */
