@@ -2749,20 +2749,27 @@ function wireAutosave(){
 
 /* ---------- Vista de solo lectura (expediente real, navegable) ---------- */
 async function showViewer(){
-  var iso='', by='', found=false;
+  var iso='', by='', found=false, dbg='';
   try{
     var res=await sb.from(TABLE).select('data,imgs,updated_at,updated_by').eq('exp_id',EXP_ID).maybeSingle();
     if(res.data){
       var pay={data:res.data.data||{}, imgs:res.data.imgs||[]};
+      var nkeys=Object.keys(pay.data||{}).length;
       applyData(pay);
-      // refuerzo: re-aplicar por si algo del arranque pisó los campos
       setTimeout(function(){ try{ applyData(pay); }catch(e){} }, 600);
       setTimeout(function(){ try{ applyData(pay); }catch(e){} }, 1500);
+      var filled=0; document.querySelectorAll('[data-key]').forEach(function(el){ if((el.textContent||'').trim()!=='') filled++; });
+      dbg='dbg keys='+nkeys+' fill='+filled;
       iso=res.data.updated_at; by=res.data.updated_by||''; found=true;
-    }
-  }catch(e){ console.error(e); }
+    } else { dbg='dbg SIN FILA'; }
+  }catch(e){ console.error(e); dbg='dbg ERROR:'+(e&&e.message?e.message:e); }
   makeReadOnly();
-  buildViewerBar(iso, by, found);
+  buildViewerBar(iso, by, found, dbg);
+  // segunda medición tras 2s para ver si algo borró
+  setTimeout(function(){
+    var f2=0; document.querySelectorAll('[data-key]').forEach(function(el){ if((el.textContent||'').trim()!=='') f2++; });
+    var b=document.getElementById('viewer-dbg'); if(b) b.textContent=' | 2s fill='+f2;
+  }, 2200);
 }
 function makeReadOnly(){
   // Desactivar edición de texto (se sigue viendo y se navega por pestañas)
@@ -2776,7 +2783,7 @@ function makeReadOnly(){
     +'.tab,.btn-blue,[onclick*="openAlb"],[onclick*="window.print"]{pointer-events:auto !important;opacity:1 !important;}';
   document.head.appendChild(css);
 }
-function buildViewerBar(iso, by, found){
+function buildViewerBar(iso, by, found, dbg){
   var bar=document.createElement('div');
   bar.id='viewer-bar';
   bar.style.cssText='position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:99999;'
@@ -2784,8 +2791,9 @@ function buildViewerBar(iso, by, found){
     +'border-radius:30px;font:600 13px system-ui;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:94vw;';
   var meta = found ? ('Actualizado '+relTime(iso)+(by?(' · '+by.split('@')[0]):'')) : 'Sin datos aún';
   bar.innerHTML=
-    '<span>👁 Solo lectura · v2</span>'
+    '<span>👁 Solo lectura · v3</span>'
     +'<span style="font-weight:400;color:#94a3b8;">'+meta+'</span>'
+    +'<span id="viewer-dbg" style="font-weight:400;color:#f59e0b;font-size:11px;">'+(dbg||'')+'</span>'
     +'<button onclick="location.reload()" style="background:#2563eb;color:#fff;border:0;border-radius:6px;padding:6px 11px;cursor:pointer;font:600 12px system-ui;">↻</button>'
     +(userEmail
        ? '<button onclick="cloudLogout()" style="background:#334155;color:#fff;border:0;border-radius:6px;padding:6px 11px;cursor:pointer;font:600 12px system-ui;">Salir</button>'
