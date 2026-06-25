@@ -7,38 +7,27 @@
   *{box-sizing:border-box}
   body{margin:0;font:16px/1.5 system-ui,Segoe UI,Arial;background:#0f172a;color:#fff;
        display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-  .card{background:#fff;color:#0f172a;border-radius:16px;padding:32px 28px;width:100%;max-width:420px;
-        box-shadow:0 20px 60px rgba(0,0,0,.45)}
-  h1{font-size:20px;margin:0 0 4px}
-  p.sub{color:#64748b;font-size:14px;margin:0 0 22px}
-  label{display:block;font-size:13px;font-weight:600;color:#334155;margin-bottom:6px}
-  input{width:100%;padding:13px 14px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px;margin-bottom:14px}
-  input:focus{outline:none;border-color:#2563eb}
-  button{width:100%;padding:14px;border:0;border-radius:10px;font:700 15px system-ui;cursor:pointer;color:#fff;background:#00A86B}
-  button:active{transform:translateY(1px)}
-  .hint{font-size:12px;color:#94a3b8;margin-top:14px;text-align:center}
-  .logo{font-weight:800;letter-spacing:.5px;color:#0057FF;margin-bottom:18px;font-size:15px}
+  .card{background:#fff;color:#0f172a;border-radius:16px;padding:34px 28px;width:100%;max-width:420px;
+        box-shadow:0 20px 60px rgba(0,0,0,.45);text-align:center}
+  .logo{font-weight:800;letter-spacing:.5px;color:#0057FF;margin-bottom:16px;font-size:15px}
+  h1{font-size:21px;margin:0 0 6px}
+  p{color:#64748b;font-size:14px;margin:0 0 22px}
+  button{width:100%;padding:15px;border:0;border-radius:10px;font:700 15px system-ui;cursor:pointer;color:#fff;background:#00A86B}
+  .small{font-size:12px;color:#94a3b8;margin-top:16px}
 </style>
 </head>
 <body>
   <div class="card">
     <div class="logo">RPG TECHNOLOGY</div>
     <h1>Crear Expediente Técnico</h1>
-    <p class="sub">Escribe el número del expediente y pulsa Abrir</p>
-    <label for="num">Nº de expediente</label>
-    <input id="num" type="text" placeholder="Ej: V2606192138" autocomplete="off" autofocus>
-    <button onclick="abrir()">Abrir expediente</button>
-    <div class="hint">Se abrirá el expediente en modo lectura. Para editar, inicia sesión dentro.</div>
+    <p>Abrirás una plantilla en blanco. Rellena los datos (incluido el Nº de Expediente) y guárdala: se generará el enlace para la carpeta del proyecto.</p>
+    <button onclick="crear()">Empezar expediente nuevo</button>
+    <div class="small">Necesitas iniciar sesión como editor.</div>
   </div>
 <script>
-  var BASE='https://rpg-a.github.io/RPG-EXPEDIENTES/exp2.html#exp=';
-  function abrir(){
-    var n=(document.getElementById('num').value||'').trim();
-    if(!n){ alert('Escribe el número del expediente.'); return; }
-    window.location.href = BASE + encodeURIComponent(n);
+  function crear(){
+    // nombre único con la hora para que siempre cargue la última versión (sin caché)
+    window.location.href = 'exp2.html?n=' + Date.now() + '#nuevo';
   }
-  document.getElementById('num').addEventListener('keydown', function(e){
-    if(e.key==='Enter') abrir();
-  });
 </script>
 </body></html>
