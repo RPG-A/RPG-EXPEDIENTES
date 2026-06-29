@@ -2619,15 +2619,11 @@ function downloadAccessFile(){
   if(!id || id==='default'){ alert('Este expediente aún no tiene número guardado. Guárdalo primero en la nube y vuelve a pulsar.'); return; }
   var url=expLink(id);
   var cli=((document.querySelector('[data-key="r-cli"]')||{}).textContent||'').trim().substring(0,30).replace(/[^a-zA-Z0-9 _.\-áéíóúÁÉÍÓÚñÑ]/g,'');
-  var fname=id+(cli?' - '+cli:'')+'.html';
-  var content='<!DOCTYPE html>\n<html lang="es"><head>\n<meta charset="utf-8">\n'
-    +'<meta name="viewport" content="width=device-width,initial-scale=1">\n'
-    +'<meta http-equiv="refresh" content="0;url='+url+'">\n<title>Abriendo expediente…</title>\n'
-    +'<scr'+'ipt>window.location.replace("'+url+'");</scr'+'ipt>\n'
-    +'<style>body{font:16px system-ui;text-align:center;padding:40px;color:#0f172a}a{color:#0057FF;font-weight:700}</style>\n'
-    +'</head>\n<body>Abriendo el expediente…<br><br><a href="'+url+'">Pulsa aquí si no se abre solo</a></body></html>';
+  var fname=id+(cli?' - '+cli:'')+'.url';
+  // Formato de acceso directo de Internet (.url)
+  var content='[InternetShortcut]\r\nURL='+url+'\r\n';
   try{
-    var blob=new Blob([content],{type:'text/html;charset=utf-8'});
+    var blob=new Blob([content],{type:'application/internet-shortcut'});
     var u=URL.createObjectURL(blob);
     var a=document.createElement('a'); a.href=u; a.download=fname; a.style.display='none';
     document.body.appendChild(a); a.click();
