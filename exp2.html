@@ -2806,9 +2806,11 @@ function showCreatedBanner(id){
   d.innerHTML='✓ Expediente <b style="margin:0 4px">'+id+'</b> creado y guardado. Enlace para la carpeta: '
     +'<code style="background:rgba(255,255,255,.2);padding:3px 7px;border-radius:5px;font-size:12px;">'+expLink(id)+'</code>'
     +'<button id="bn-copy" style="background:#fff;color:#00A86B;border:0;border-radius:7px;padding:7px 12px;font:700 12px system-ui;cursor:pointer;">Copiar enlace</button>'
+    +'<button id="bn-dl" style="background:#0057FF;color:#fff;border:0;border-radius:7px;padding:7px 12px;font:700 12px system-ui;cursor:pointer;">⬇ Descargar acceso</button>'
     +'<button id="bn-x" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:7px;padding:7px 10px;font:600 12px system-ui;cursor:pointer;">Cerrar</button>';
   document.body.appendChild(d);
   document.getElementById('bn-copy').onclick=function(){ copyExpLink(id); var x=this; var o=x.textContent; x.textContent='✓ Copiado'; setTimeout(function(){x.textContent=o;},1800); };
+  document.getElementById('bn-dl').onclick=function(){ downloadAccessFile(); };
   document.getElementById('bn-x').onclick=function(){ d.remove(); };
 }
 
