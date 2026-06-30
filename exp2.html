@@ -257,7 +257,7 @@ hr.div{border:none;border-top:1px solid #D4DAE6;margin:12px 0;}
   [contenteditable] { outline:none!important; background:inherit!important; }
 
   /* Ocultar SIEMPRE elementos de la nube al imprimir/descargar */
-  #cloud-pill, #btn-copy-link, #viewer-bar, #create-hint, #cloud-msg, [id^="cloud-"]{ display:none!important; }
+  #cloud-pill, #btn-copy-link, #viewer-bar, #create-hint, #cloud-msg, [id^="cloud-"], .cloud-hide{ display:none!important; }
 
   /* ── IMPRESIÓN EXPEDIENTE (botón topbar) ── */
   body:not(.printing-alb):not(.printing-insp) .topbar,
@@ -672,8 +672,8 @@ hr.div{border:none;border-top:1px solid #D4DAE6;margin:12px 0;}
 <th class="r" style="width:8%">Ud.</th>
 <th style="width:18%">Proveedor</th>
 </tr></thead>
-<tbody>
-<tr>
+<tbody id="eq-lst-body">
+<tr data-lst-row="1">
 <td contenteditable="true" data-key="lst-e1"></td>
 <td contenteditable="true" data-key="lst-s1"></td>
 <td class="r" contenteditable="true" data-key="lst-u1"></td>
@@ -688,6 +688,10 @@ hr.div{border:none;border-top:1px solid #D4DAE6;margin:12px 0;}
 <tr><td contenteditable="true" data-key="lst-e8"></td><td contenteditable="true" data-key="lst-s8"></td><td class="r" contenteditable="true" data-key="lst-u8"></td><td contenteditable="true" data-key="lst-p8"></td></tr>
 </tbody>
 </table>
+<div class="cloud-hide" style="padding:10px 4px 2px;display:flex;gap:8px;">
+<button class="btn btn-ghost" onclick="addEquipoRow()" style="font-size:12px;background:#0057FF;border-color:#0057FF;color:#fff;">+ Añadir fila</button>
+<button class="btn btn-ghost" onclick="removeLastEquipoRow()" style="font-size:12px;">− Quitar última fila</button>
+</div>
 </div></div>
 </div>
 <!-- ═══ DESCRIPCIÓN ═══ -->
@@ -1239,8 +1243,8 @@ hr.div{border:none;border-top:1px solid #D4DAE6;margin:12px 0;}
 <div style="font-size:8.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;">Uds.</div>
 <div style="font-size:8.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;">Nº Serie</div>
 </div>
-<div>
-<div style="display:grid;grid-template-columns:4px 1fr 80px 130px;border:1px solid #e8e8e8;border-top:none;">
+<div id="alb-lst-body">
+<div style="display:grid;grid-template-columns:4px 1fr 80px 130px;border:1px solid #e8e8e8;border-top:none;" data-lst-row="1">
 <div style="background:#e8e8e8;"></div>
 <div contenteditable="true" data-key="lst-e1" style="padding:6px 10px;font-size:10.5px;border-right:1px solid #e8e8e8;outline:none;background:#FFFEF0;min-height:22px;"></div>
 <div contenteditable="true" data-key="lst-u1" style="padding:6px 4px;font-size:10.5px;border-right:1px solid #e8e8e8;outline:none;background:#FFFEF0;text-align:center;"></div>
@@ -1282,7 +1286,7 @@ hr.div{border:none;border-top:1px solid #D4DAE6;margin:12px 0;}
 <div contenteditable="true" data-key="lst-s8" style="padding:6px 6px;font-size:10.5px;outline:none;background:#FFFEF0;text-align:center;"></div>
 </div>
 <!-- OBSERVACIONES dentro de la tabla -->
-<div style="display:grid;grid-template-columns:4px 1fr 80px 130px;border:1px solid #e8e8e8;border-top:1px solid #bbb;">
+<div id="alb-obs-row" style="display:grid;grid-template-columns:4px 1fr 80px 130px;border:1px solid #e8e8e8;border-top:1px solid #bbb;">
 <div style="background:#0057FF;"></div>
 <div style="display:flex;align-items:stretch;grid-column:span 3;">
 <div style="background:#0A0F1E;color:rgba(255,255,255,.8);font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px;white-space:nowrap;display:flex;align-items:center;flex-shrink:0;">Observaciones</div>
@@ -2660,8 +2664,64 @@ function collectData(){
   if(ic){ d['_html_insp']=ic.innerHTML; d['_attr_insp_cleared']=ic.getAttribute('data-insp-cleared')||''; }
   return { data:d, imgs:(typeof imgs!=='undefined'?imgs:[]) };
 }
+/* ---------- Filas dinámicas de Equipos/Servicios (sincronizadas con albarán) ---------- */
+function nextLstIdx(){
+  var max=0;
+  document.querySelectorAll('[data-key^="lst-e"]').forEach(function(el){
+    var m=(el.dataset.key||'').match(/^lst-e(\d+)$/); if(m){ var n=+m[1]; if(n>max) max=n; }
+  });
+  return max+1;
+}
+function _mkEqTabRow(i){
+  var tr=document.createElement('tr');
+  tr.setAttribute('data-lst-row',i);
+  tr.innerHTML='<td contenteditable="true" data-key="lst-e'+i+'"></td>'
+    +'<td contenteditable="true" data-key="lst-s'+i+'"></td>'
+    +'<td class="r" contenteditable="true" data-key="lst-u'+i+'"></td>'
+    +'<td contenteditable="true" data-key="lst-p'+i+'"></td>';
+  return tr;
+}
+function _mkAlbRow(i){
+  var d=document.createElement('div');
+  d.setAttribute('data-lst-row',i);
+  d.style.cssText='display:grid;grid-template-columns:4px 1fr 80px 130px;border:1px solid #e8e8e8;border-top:none;';
+  d.innerHTML='<div style="background:#e8e8e8;"></div>'
+    +'<div contenteditable="true" data-key="lst-e'+i+'" style="padding:6px 10px;font-size:10.5px;border-right:1px solid #e8e8e8;outline:none;background:#FFFEF0;min-height:22px;"></div>'
+    +'<div contenteditable="true" data-key="lst-u'+i+'" style="padding:6px 4px;font-size:10.5px;border-right:1px solid #e8e8e8;outline:none;background:#FFFEF0;text-align:center;"></div>'
+    +'<div contenteditable="true" data-key="lst-s'+i+'" style="padding:6px 6px;font-size:10.5px;outline:none;background:#FFFEF0;text-align:center;"></div>';
+  return d;
+}
+function addEquipoRow(i){
+  if(!i) i=nextLstIdx();
+  // registrar sincronización equipos<->albarán para esta fila (mismo data-key en ambas tablas)
+  try{ if(typeof _SY!=='undefined'){ _SY['lst-e'+i]=['lst-e'+i]; _SY['lst-u'+i]=['lst-u'+i]; _SY['lst-s'+i]=['lst-s'+i]; } }catch(e){}
+  var tb=document.getElementById('eq-lst-body');
+  if(tb && !tb.querySelector('[data-key="lst-e'+i+'"]')) tb.appendChild(_mkEqTabRow(i));
+  var ab=document.getElementById('alb-lst-body');
+  if(ab && !ab.querySelector('[data-key="lst-e'+i+'"]')){
+    var obs=document.getElementById('alb-obs-row');
+    if(obs) ab.insertBefore(_mkAlbRow(i),obs); else ab.appendChild(_mkAlbRow(i));
+  }
+  return i;
+}
+function removeLastEquipoRow(){
+  var max=nextLstIdx()-1;
+  if(max<=8) return; // no quitar las 8 filas base
+  document.querySelectorAll('[data-lst-row="'+max+'"]').forEach(function(el){ el.remove(); });
+  try{ if(typeof scheduleCloudSave==='function') scheduleCloudSave(); }catch(e){}
+}
+function ensureLstRows(data){
+  var max=8;
+  Object.keys(data||{}).forEach(function(k){
+    var m=k.match(/^lst-[esup](\d+)$/);
+    if(m){ var v=(data[k]==null?'':String(data[k])).replace(/<br\s*\/?>/gi,'').replace(/&nbsp;/gi,'').trim(); if(v){ var n=+m[1]; if(n>max) max=n; } }
+  });
+  for(var i=9;i<=max;i++) addEquipoRow(i);
+}
+
 function applyData(payload){
   var d=payload.data||{};
+  try{ ensureLstRows(d); }catch(e){}
   document.querySelectorAll('[data-key]').forEach(function(el){
     var key=el.dataset.key, val=d[key];
     if(val===undefined) return;
