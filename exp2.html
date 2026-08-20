@@ -1074,6 +1074,13 @@ hr.div{border:none;border-top:1px solid #D4DAE6;margin:12px 0;}
 <div style="background:#E8F4FD;border:1px solid #B8D8F0;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#1a5276;">
       💡 Rellena los campos de abajo, luego pulsa <strong>"Abrir albarán"</strong> para revisarlo y guardarlo como PDF.
     </div>
+<!-- ── Barra de tabs multi-albarán ── -->
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+<div id="xalb-tabs-bar" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+<button class="cloud-hide btn btn-ghost" onclick="addAlbTab()" style="font-size:12px;background:#00A86B;border-color:#00A86B;color:#fff;padding:5px 12px;">+ Añadir albarán</button>
+</div>
+<!-- ── Campos principales (Albarán 1) ── -->
+<div id="xalb-main-fields">
 <div class="g g4" style="margin-bottom:16px;">
 <div class="f"><label>Nº Albarán / RMA</label><div class="v hi mono" contenteditable="true" data-key="alb-nro"></div></div>
 <div class="f"><label>Técnico Instalador RPG</label><div class="v empty" contenteditable="true" data-key="alb-tec"></div></div>
@@ -1119,7 +1126,11 @@ hr.div{border:none;border-top:1px solid #D4DAE6;margin:12px 0;}
 </div>
 </div>
 </div>
-<div style="display:flex;justify-content:flex-end;">
+</div><!-- /xalb-main-fields -->
+<!-- ── Paneles extra (Albarán 2, 3...) ── -->
+<div id="xalb-extras-container"></div>
+<!-- ── Botón Abrir albarán 1 ── -->
+<div style="display:flex;justify-content:flex-end;" id="xalb-main-open-btn">
 <button class="btn btn-blue" onclick="openAlb()">
 <svg fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;" viewbox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
         Abrir albarán para imprimir / PDF
@@ -2264,6 +2275,148 @@ function syncAlbLabels() {
   });
 }
 
+/* ═══════════════════════════════════════════════
+   MULTI-ALBARÁN — entregas parciales
+   Albarán 1 = campos existentes (alb-tec, alb-obs, rep-*, alb-elev-*, alb-who-*)
+   Albarán 2+ = copias dinámicas con prefijo xalb-N-
+   Todos comparten: alb-nro, alb-gar-*, alb-mant-*, alb-nserie
+═══════════════════════════════════════════════ */
+var _xAlbs=[];  // [{id:2, data:{}}]
+var _xAlbActive=1; // 1=principal, 2,3...=extras
+
+function _xAlbTabsRender(){
+  var bar=document.getElementById('xalb-tabs-bar');
+  if(!bar) return;
+  bar.innerHTML='';
+  // tab 1 (principal siempre)
+  var t1=document.createElement('button');
+  t1.className='btn btn-ghost'+((_xAlbActive===1)?' xalb-tab-on':'');
+  t1.style.cssText='font-size:12px;padding:5px 12px;'+((_xAlbActive===1)?'background:#0A0F1E;color:#fff;':'');
+  t1.textContent='Albarán 1';
+  t1.onclick=function(){_xAlbSwitch(1);};
+  bar.appendChild(t1);
+  _xAlbs.forEach(function(x){
+    var t=document.createElement('button');
+    t.className='btn btn-ghost'+((_xAlbActive===x.id)?' xalb-tab-on':'');
+    t.style.cssText='font-size:12px;padding:5px 12px;'+((_xAlbActive===x.id)?'background:#0A0F1E;color:#fff;':'');
+    t.textContent='Albarán '+x.id;
+    t.onclick=(function(xid){return function(){_xAlbSwitch(xid);};})(x.id);
+    // botón eliminar
+    var del=document.createElement('span');
+    del.textContent=' ×';
+    del.style.cssText='cursor:pointer;color:#e74;font-weight:700;margin-left:2px;';
+    del.onclick=(function(xid){return function(e){e.stopPropagation();_xAlbRemove(xid);};})(x.id);
+    t.appendChild(del);
+    bar.appendChild(t);
+  });
+}
+
+function _xAlbFieldsHTML(id){
+  var p='xalb-'+id+'-';
+  return '<div style="border:2px solid #0057FF;border-radius:8px;padding:16px;margin-bottom:8px;" id="xalb-panel-'+id+'">'
+    +'<div style="font-weight:700;color:#0057FF;font-size:13px;margin-bottom:12px;">Albarán '+id+' — datos de esta entrega</div>'
+    +'<div class="g g4" style="margin-bottom:12px;">'
+    +'<div class="f"><label>Técnico RPG</label><div class="v empty" contenteditable="true" data-key="'+p+'tec"></div></div>'
+    +'<div class="f s3"><label>Nº Serie Equipos entregados</label><div class="v empty" contenteditable="true" data-key="'+p+'nserie"></div></div>'
+    +'</div>'
+    +'<div class="g g4" style="margin-bottom:12px;">'
+    +'<div class="f s2"><label>¿Medios de elevación?</label><div class="badge-row">'
+    +'<span class="badge" id="'+p+'elev-si" onclick="sel1(\''+p+'elev-si\',\''+p+'elev-no\')">✓ Sí</span>'
+    +'<span class="badge" id="'+p+'elev-no" onclick="sel1(\''+p+'elev-no\',\''+p+'elev-si\')">✗ No</span>'
+    +'</div></div>'
+    +'<div class="f s2"><label>¿Quién pone los medios?</label><div class="badge-row">'
+    +'<span class="badge" id="'+p+'who-cli" onclick="sel1(\''+p+'who-cli\',\''+p+'who-rpg\')">Cliente</span>'
+    +'<span class="badge" id="'+p+'who-rpg" onclick="sel1(\''+p+'who-rpg\',\''+p+'who-cli\')">RPG</span>'
+    +'</div></div>'
+    +'</div>'
+    +'<div class="f" style="margin-bottom:12px;"><label>Observaciones / Artículos entregados</label>'
+    +'<div class="v empty" contenteditable="true" data-key="'+p+'obs" style="min-height:50px;"></div></div>'
+    +'<div style="display:flex;justify-content:flex-end;">'
+    +'<button class="btn btn-blue" onclick="_xAlbOpenN('+id+')">'
+    +'<svg fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;" viewbox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>'
+    +' Abrir albarán '+id+' para imprimir / PDF</button></div>'
+    +'</div>';
+}
+
+function _xAlbSwitch(id){
+  _xAlbActive=id;
+  _xAlbTabsRender();
+  // mostrar/ocultar panel principal
+  var pMain=document.getElementById('xalb-main-fields');
+  if(pMain) pMain.style.display=(id===1)?'':'none';
+  // mostrar/ocultar paneles extras
+  _xAlbs.forEach(function(x){
+    var p=document.getElementById('xalb-panel-'+x.id);
+    if(p) p.style.display=(x.id===id)?'':'none';
+  });
+}
+
+function addAlbTab(){
+  var maxId=1;
+  _xAlbs.forEach(function(x){if(x.id>maxId)maxId=x.id;});
+  var newId=maxId+1;
+  _xAlbs.push({id:newId});
+  // insertar HTML del nuevo panel
+  var container=document.getElementById('xalb-extras-container');
+  if(container){
+    var div=document.createElement('div');
+    div.innerHTML=_xAlbFieldsHTML(newId);
+    container.appendChild(div.firstChild);
+  }
+  _xAlbTabsRender();
+  _xAlbSwitch(newId);
+  try{scheduleCloudSave();}catch(e){}
+}
+
+function _xAlbRemove(id){
+  _xAlbs=_xAlbs.filter(function(x){return x.id!==id;});
+  var p=document.getElementById('xalb-panel-'+id);
+  if(p && p.parentNode) p.parentNode.removeChild(p);
+  _xAlbTabsRender();
+  _xAlbSwitch(1);
+  try{scheduleCloudSave();}catch(e){}
+}
+
+function _xAlbOpenN(id){
+  // igual que openAlb pero para un albarán extra: rellena el overlay con los datos del extra
+  syncBadgesToPchk(); syncAlbLabels();
+  var ov=document.getElementById('alb-ov');
+  if(!ov) return;
+  // clonar el alb-body y sustituir los campos variables
+  var clone=document.getElementById('alb-body').cloneNode(true);
+  var p='xalb-'+id+'-';
+  // técnico
+  var tecExtra=document.querySelector('[data-key="'+p+'tec"]');
+  var tecOv=clone.querySelector('[data-key="alb-tec"]');
+  if(tecExtra && tecOv) tecOv.innerHTML=tecExtra.innerHTML;
+  // observaciones
+  var obsExtra=document.querySelector('[data-key="'+p+'obs"]');
+  var obsOv=clone.querySelector('[data-key="alb-obs"]');
+  if(obsExtra && obsOv) obsOv.innerHTML=obsExtra.innerHTML;
+  // nserie
+  var nsExtra=document.querySelector('[data-key="'+p+'nserie"]');
+  var nsOv=clone.querySelector('[data-key="alb-nserie"]');
+  if(nsExtra && nsOv) nsOv.innerHTML=nsExtra.innerHTML;
+  // badges elevación
+  ['elev-si','elev-no','who-cli','who-rpg'].forEach(function(b){
+    var src=document.getElementById(p+b);
+    var dst=clone.querySelector('#alb-'+b);
+    if(src && dst){
+      dst.className=src.className;
+    }
+  });
+  // poner el clone en el print-sheet y abrir
+  var sheet=document.getElementById('print-sheet');
+  if(sheet){
+    sheet.innerHTML='<div class="alb-doc">'+clone.innerHTML+'</div>';
+    var doc=sheet.querySelector('.alb-doc');
+    if(doc){doc.style.zoom='1';var h=doc.scrollHeight;if(h>1050)doc.style.zoom=String(Math.floor((1050/h)*100)/100);}
+    sheet.style.display='block';
+  }
+  ov.classList.add('open');
+  document.body.style.overflow='hidden';
+}
+
 function openAlb(){syncBadgesToPchk();syncAlbLabels();document.getElementById('alb-ov').classList.add('open');document.body.style.overflow='hidden';buildAllSat();}
 function closeAlb(){
   document.getElementById('alb-ov').classList.remove('open');
@@ -2662,6 +2815,25 @@ function collectData(){
   try{ if(typeof satVal!=='undefined') d['_satVal']=JSON.stringify(satVal); }catch(e){}
   var ic=document.getElementById('insp-container');
   if(ic){ d['_html_insp']=ic.innerHTML; d['_attr_insp_cleared']=ic.getAttribute('data-insp-cleared')||''; }
+  // guardar albaranes extra
+  try{
+    var xalbs=[];
+    _xAlbs.forEach(function(x){
+      var xd={id:x.id};
+      var p='xalb-'+x.id+'-';
+      document.querySelectorAll('[data-key^="'+p+'"]').forEach(function(el){
+        xd[el.dataset.key]=el.innerHTML;
+      });
+      // badges
+      ['elev-si','elev-no','who-cli','who-rpg'].forEach(function(b){
+        var el=document.getElementById(p+b);
+        if(el) xd['_badge_'+p+b]=el.classList.contains('on')?'on':'';
+      });
+      xalbs.push(xd);
+    });
+    if(xalbs.length) d['_xAlbs']=JSON.stringify(xalbs);
+    d['_xAlbCount']=String(_xAlbs.length);
+  }catch(e){}
   return { data:d, imgs:(typeof imgs!=='undefined'?imgs:[]) };
 }
 /* ---------- Filas dinámicas de Equipos/Servicios (sincronizadas con albarán) ---------- */
@@ -2752,6 +2924,39 @@ function applyData(payload){
     }
   }
   if(payload.imgs){ try{ window.imgs=payload.imgs; renderImgs(); }catch(e){} }
+  // Restaurar albaranes extra
+  try{
+    if(d['_xAlbs']){
+      var xalbs=JSON.parse(d['_xAlbs']);
+      // limpiar existentes
+      _xAlbs=[]; var c=document.getElementById('xalb-extras-container'); if(c) c.innerHTML='';
+      xalbs.forEach(function(x){
+        _xAlbs.push({id:x.id});
+        var container=document.getElementById('xalb-extras-container');
+        if(container){
+          var div=document.createElement('div');
+          div.innerHTML=_xAlbFieldsHTML(x.id);
+          container.appendChild(div.firstChild);
+        }
+        // rellenar campos de texto
+        var p='xalb-'+x.id+'-';
+        Object.keys(x).forEach(function(k){
+          if(k==='id') return;
+          if(k.indexOf('_badge_')===0) return;
+          var el=document.querySelector('[data-key="'+k+'"]');
+          if(el) el.innerHTML=x[k];
+        });
+        // rellenar badges
+        ['elev-si','elev-no','who-cli','who-rpg'].forEach(function(b){
+          var el=document.getElementById(p+b);
+          if(el){ el.classList.toggle('on', x['_badge_'+p+b]==='on'); el.classList.toggle('on-no', false); }
+        });
+      });
+      _xAlbTabsRender();
+      _xAlbSwitch(1);
+    }
+  }catch(e){}
+
   // Consolidar campos sincronizados SIN borrar: rellena origen y espejos
   // con el primer valor no vacío del grupo (evita que un origen vacío borre los demás)
   try{
@@ -3017,7 +3222,7 @@ function showCreateHint(){
   document.body.appendChild(d);
 }
 
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(cloudStart,0); });
-else setTimeout(cloudStart,0);
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(cloudStart,0); setTimeout(_xAlbTabsRender,100); });
+else { setTimeout(cloudStart,0); setTimeout(_xAlbTabsRender,100); }
 </script>
 </body></html>
