@@ -58,6 +58,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .btn-ghost:hover{background:rgba(255,255,255,.1);}
 .btn-blue{background:#0057FF;border-color:#0057FF;color:#fff;box-shadow:0 2px 8px rgba(0,87,255,.3);}
 .btn-blue:hover{background:#003ECC;}
+.xalb-tab{background:#fff;border:1.5px solid #C9D2E0;color:#0A0F1E;}
+.xalb-tab:hover{background:#F2F4F8;border-color:#0057FF;}
+.xalb-tab.xalb-tab-on{background:#0A0F1E;border-color:#0A0F1E;color:#fff;}
 .btn-red{background:transparent;border-color:#c0392b;color:#c0392b;}
 .btn-red:hover{background:#c0392b;color:#fff;}
 
@@ -2249,7 +2252,11 @@ function sel1(){
 function syncAlbLabels() {
   var a1c = document.querySelector('[data-key="lst-e1"]');
   if (!a1c) return;
-  var txt = (a1c.innerText || a1c.textContent || '').toLowerCase();
+  var raw = (a1c.innerText || a1c.textContent || '');
+  // Solo miramos la PRIMERA frase (hasta el primer punto), no la descripción entera.
+  // Así evitamos falsos positivos con specs técnicas tipo "...mantenimiento frontal..."
+  // que aparecen más adelante en descripciones de pantallas LED.
+  var txt = raw.split('.')[0].toLowerCase();
 
   var tipo;
   if (txt.indexOf('visita') !== -1)         tipo = 'Visita Técnica';
@@ -2290,15 +2297,15 @@ function _xAlbTabsRender(){
   bar.innerHTML='';
   // tab 1 (principal siempre)
   var t1=document.createElement('button');
-  t1.className='btn btn-ghost'+((_xAlbActive===1)?' xalb-tab-on':'');
-  t1.style.cssText='font-size:12px;padding:5px 12px;'+((_xAlbActive===1)?'background:#0A0F1E;color:#fff;':'');
+  t1.className='btn xalb-tab'+((_xAlbActive===1)?' xalb-tab-on':'');
+  t1.style.cssText='font-size:12px;padding:5px 12px;';
   t1.textContent='Albarán 1';
   t1.onclick=function(){_xAlbSwitch(1);};
   bar.appendChild(t1);
   _xAlbs.forEach(function(x){
     var t=document.createElement('button');
-    t.className='btn btn-ghost'+((_xAlbActive===x.id)?' xalb-tab-on':'');
-    t.style.cssText='font-size:12px;padding:5px 12px;'+((_xAlbActive===x.id)?'background:#0A0F1E;color:#fff;':'');
+    t.className='btn xalb-tab'+((_xAlbActive===x.id)?' xalb-tab-on':'');
+    t.style.cssText='font-size:12px;padding:5px 12px;';
     t.textContent='Albarán '+x.id;
     t.onclick=(function(xid){return function(){_xAlbSwitch(xid);};})(x.id);
     // botón eliminar
@@ -2311,13 +2318,99 @@ function _xAlbTabsRender(){
   });
 }
 
+function _xAlbNextItemIdx(id){
+  var max=0;
+  var re=new RegExp('^xalb-'+id+'-lst-e(\\d+)$');
+  document.querySelectorAll('[data-key^="xalb-'+id+'-lst-e"]').forEach(function(el){
+    var m=(el.dataset.key||'').match(re);
+    if(m){ var n=+m[1]; if(n>max) max=n; }
+  });
+  return max+1;
+}
+function _xAlbMkItemRow(id,i){
+  var p='xalb-'+id+'-';
+  var d=document.createElement('div');
+  d.setAttribute('data-xalb-row', i);
+  d.style.cssText='display:grid;grid-template-columns:4px 1fr 80px 130px;border:1px solid #e8e8e8;border-top:none;';
+  d.innerHTML='<div style="background:#e8e8e8;"></div>'
+    +'<div contenteditable="true" data-key="'+p+'lst-e'+i+'" style="padding:6px 10px;font-size:10.5px;border-right:1px solid #e8e8e8;outline:none;background:#FFFEF0;min-height:22px;"></div>'
+    +'<div contenteditable="true" data-key="'+p+'lst-u'+i+'" style="padding:6px 4px;font-size:10.5px;border-right:1px solid #e8e8e8;outline:none;background:#FFFEF0;text-align:center;"></div>'
+    +'<div contenteditable="true" data-key="'+p+'lst-s'+i+'" style="padding:6px 6px;font-size:10.5px;outline:none;background:#FFFEF0;text-align:center;"></div>';
+  return d;
+}
+function _xAlbAddItemRow(id, i){
+  if(!i) i=_xAlbNextItemIdx(id);
+  var body=document.getElementById('xalb-items-body-'+id);
+  if(body && !body.querySelector('[data-key="xalb-'+id+'-lst-e'+i+'"]')) body.appendChild(_xAlbMkItemRow(id,i));
+  return i;
+}
+function _xAlbRemoveItemRow(id){
+  var max=_xAlbNextItemIdx(id)-1;
+  if(max<=1) return; // mantener al menos 1 fila
+  var body=document.getElementById('xalb-items-body-'+id);
+  if(body){
+    var row=body.querySelector('[data-xalb-row="'+max+'"]');
+    if(row) row.remove();
+  }
+  try{ if(typeof scheduleCloudSave==='function') scheduleCloudSave(); }catch(e){}
+}
+
 function _xAlbFieldsHTML(id){
   var p='xalb-'+id+'-';
   return '<div style="border:2px solid #0057FF;border-radius:8px;padding:16px;margin-bottom:8px;" id="xalb-panel-'+id+'">'
-    +'<div style="font-weight:700;color:#0057FF;font-size:13px;margin-bottom:12px;">Albarán '+id+' — datos de esta entrega</div>'
+    +'<div style="font-weight:700;color:#0057FF;font-size:13px;margin-bottom:4px;">Albarán '+id+' — datos de esta entrega (100% independiente)</div>'
+    +'<div style="font-size:11px;color:#888;margin-bottom:12px;">Se rellena automáticamente al duplicar. A partir de aquí, todo lo que edites aquí solo afecta a este albarán.</div>'
     +'<div class="g g4" style="margin-bottom:12px;">'
+    +'<div class="f s2"><label>Cliente</label><div class="v empty" contenteditable="true" data-key="'+p+'cli"></div></div>'
+    +'<div class="f s2"><label>Dirección Facturación</label><div class="v empty" contenteditable="true" data-key="'+p+'df"></div></div>'
+    +'</div>'
+    +'<div class="g g4" style="margin-bottom:12px;">'
+    +'<div class="f s2"><label>Fecha de esta entrega</label><div class="v empty" contenteditable="true" data-key="'+p+'fe"></div></div>'
+    +'<div class="f s2"><label>Dirección de entrega</label><div class="v empty" contenteditable="true" data-key="'+p+'di"></div></div>'
+    +'</div>'
+    +'<div class="g g4" style="margin-bottom:16px;">'
+    +'<div class="f s2"><label>Contacto de entrega</label><div class="v empty" contenteditable="true" data-key="'+p+'co"></div></div>'
+    +'</div>'
+    +'<div style="margin-bottom:16px;">'
+    +'<div style="font-weight:600;font-size:11.5px;color:#555;margin-bottom:6px;">Artículo / Concepto de este albarán</div>'
+    +'<div style="background:#0A0F1E;display:grid;grid-template-columns:4px 1fr 80px 130px;min-height:28px;">'
+    +'<div style="background:#0057FF;"></div>'
+    +'<div style="font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.7);display:flex;align-items:center;padding:0 10px;">Artículo / Concepto</div>'
+    +'<div style="font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;">Uds.</div>'
+    +'<div style="font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;">Nº Serie</div>'
+    +'</div>'
+    +'<div id="xalb-items-body-'+id+'"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:6px;">'
+    +'<button onclick="_xAlbAddItemRow('+id+');scheduleCloudSave&&scheduleCloudSave();" style="font-size:11px;padding:4px 10px;border:1px solid #C9D2E0;border-radius:6px;background:#fff;color:#0A0F1E;cursor:pointer;">+ Añadir fila</button>'
+    +'<button onclick="_xAlbRemoveItemRow('+id+')" style="font-size:11px;padding:4px 10px;border:1px solid #C9D2E0;border-radius:6px;background:#fff;color:#0A0F1E;cursor:pointer;">− Quitar última fila</button>'
+    +'</div>'
+    +'</div>'
+    +'<div class="g g4" style="margin-bottom:12px;">'
+    +'<div class="f"><label>Nº Albarán / RMA</label><div class="v hi mono" contenteditable="true" data-key="'+p+'nro"></div></div>'
     +'<div class="f"><label>Técnico RPG</label><div class="v empty" contenteditable="true" data-key="'+p+'tec"></div></div>'
-    +'<div class="f s3"><label>Nº Serie Equipos entregados</label><div class="v empty" contenteditable="true" data-key="'+p+'nserie"></div></div>'
+    +'<div class="f s2"><label>Nº Serie Equipos entregados</label><div class="v empty" contenteditable="true" data-key="'+p+'nserie"></div></div>'
+    +'</div>'
+    +'<div class="g g4" style="margin-bottom:12px;">'
+    +'<div class="f s2">'
+    +'<label>Garantía incluida</label>'
+    +'<div class="badge-row">'
+    +'<span class="badge" id="'+p+'gar-si" onclick="sel1(\''+p+'gar-si\',\''+p+'gar-no\')">✓ Sí</span>'
+    +'<span class="badge" id="'+p+'gar-no" onclick="sel1(\''+p+'gar-no\',\''+p+'gar-si\')">✗ No</span>'
+    +'</div></div>'
+    +'<div class="f s2">'
+    +'<label>Mantenimiento incluido</label>'
+    +'<div class="badge-row">'
+    +'<span class="badge" id="'+p+'mant-si" onclick="sel1(\''+p+'mant-si\',\''+p+'mant-no\')">✓ Sí</span>'
+    +'<span class="badge" id="'+p+'mant-no" onclick="sel1(\''+p+'mant-no\',\''+p+'mant-si\')">✗ No</span>'
+    +'</div></div>'
+    +'</div>'
+    +'<div class="g g4" style="margin-bottom:12px;">'
+    +'<div class="f"><label>Garantía — Desde</label><div class="v empty" contenteditable="true" data-key="'+p+'gar-d"></div></div>'
+    +'<div class="f"><label>Garantía — Hasta</label><div class="v empty" contenteditable="true" data-key="'+p+'gar-h"></div></div>'
+    +'</div>'
+    +'<div class="g g4" style="margin-bottom:12px;">'
+    +'<div class="f"><label>Mantenimiento — Desde</label><div class="v empty" contenteditable="true" data-key="'+p+'mant-d"></div></div>'
+    +'<div class="f"><label>Mantenimiento — Hasta</label><div class="v empty" contenteditable="true" data-key="'+p+'mant-h"></div></div>'
     +'</div>'
     +'<div class="g g4" style="margin-bottom:12px;">'
     +'<div class="f s2"><label>¿Medios de elevación?</label><div class="badge-row">'
@@ -2363,6 +2456,31 @@ function addAlbTab(){
     div.innerHTML=_xAlbFieldsHTML(newId);
     container.appendChild(div.firstChild);
   }
+  // Duplicar automáticamente los datos ACTUALES (cliente, direcciones, fecha, artículos) del
+  // Listado de Equipos / Albarán 1. A partir de aquí este albarán queda 100% independiente:
+  // cambios posteriores en Albarán 1 o en Equipos NO tocan este albarán ya creado, y viceversa.
+  try{
+    var p='xalb-'+newId+'-';
+    ['cli','df','fe','di','co'].forEach(function(k){
+      var src=document.querySelector('[data-key="alb-'+k+'"]');
+      var dst=document.querySelector('[data-key="'+p+k+'"]');
+      if(src && dst) dst.innerHTML=src.innerHTML;
+    });
+    var maxRow=0;
+    document.querySelectorAll('[data-key^="lst-e"]').forEach(function(el){
+      var m=(el.dataset.key||'').match(/^lst-e(\d+)$/);
+      if(m){ var n=+m[1]; if(n>maxRow) maxRow=n; }
+    });
+    if(maxRow<1) maxRow=8;
+    for(var i=1;i<=maxRow;i++){
+      _xAlbAddItemRow(newId, i);
+      ['e','u','s'].forEach(function(suf){
+        var src=document.querySelector('[data-key="lst-'+suf+i+'"]');
+        var dst=document.querySelector('[data-key="'+p+'lst-'+suf+i+'"]');
+        if(src && dst) dst.innerHTML=src.innerHTML;
+      });
+    }
+  }catch(e){ console.error(e); }
   _xAlbTabsRender();
   _xAlbSwitch(newId);
   try{scheduleCloudSave();}catch(e){}
@@ -2385,26 +2503,47 @@ function _xAlbOpenN(id){
   // clonar el alb-body y sustituir los campos variables
   var clone=document.getElementById('alb-body').cloneNode(true);
   var p='xalb-'+id+'-';
-  // técnico
-  var tecExtra=document.querySelector('[data-key="'+p+'tec"]');
-  var tecOv=clone.querySelector('[data-key="alb-tec"]');
-  if(tecExtra && tecOv) tecOv.innerHTML=tecExtra.innerHTML;
-  // observaciones
-  var obsExtra=document.querySelector('[data-key="'+p+'obs"]');
-  var obsOv=clone.querySelector('[data-key="alb-obs"]');
-  if(obsExtra && obsOv) obsOv.innerHTML=obsExtra.innerHTML;
-  // nserie
-  var nsExtra=document.querySelector('[data-key="'+p+'nserie"]');
-  var nsOv=clone.querySelector('[data-key="alb-nserie"]');
-  if(nsExtra && nsOv) nsOv.innerHTML=nsExtra.innerHTML;
-  // badges elevación
-  ['elev-si','elev-no','who-cli','who-rpg'].forEach(function(b){
+  // campos de texto propios de este albarán (independientes del Albarán 1 y de otros extras)
+  ['cli','df','fe','di','co','nro','tec','obs','nserie','gar-d','gar-h','mant-d','mant-h'].forEach(function(k){
+    var src=document.querySelector('[data-key="'+p+k+'"]');
+    var dst=clone.querySelector('[data-key="alb-'+k+'"]');
+    if(src && dst) dst.innerHTML=src.innerHTML;
+  });
+  // badges propios de este albarán (elevación, quién pone medios, garantía, mantenimiento)
+  ['elev-si','elev-no','who-cli','who-rpg','gar-si','gar-no','mant-si','mant-no'].forEach(function(b){
     var src=document.getElementById(p+b);
     var dst=clone.querySelector('#alb-'+b);
     if(src && dst){
       dst.className=src.className;
     }
   });
+  // Reconstruir la tabla de Artículo/Concepto SOLO con los artículos propios de este albarán
+  // (no la lista general de Equipos del expediente)
+  var tbody=clone.querySelector('#alb-lst-body');
+  if(tbody){
+    var obsRow=tbody.querySelector('#alb-obs-row');
+    Array.from(tbody.querySelectorAll('[data-lst-row]')).forEach(function(r){ r.remove(); });
+    var re=new RegExp('^xalb-'+id+'-lst-e(\\d+)$');
+    var idxs=[];
+    document.querySelectorAll('[data-key^="xalb-'+id+'-lst-e"]').forEach(function(el){
+      var m=(el.dataset.key||'').match(re); if(m) idxs.push(+m[1]);
+    });
+    idxs.sort(function(a,b){return a-b;});
+    idxs.forEach(function(i){
+      var eEl=document.querySelector('[data-key="'+p+'lst-e'+i+'"]');
+      var uEl=document.querySelector('[data-key="'+p+'lst-u'+i+'"]');
+      var sEl=document.querySelector('[data-key="'+p+'lst-s'+i+'"]');
+      var eV=eEl?eEl.innerHTML:''; var uV=uEl?uEl.innerHTML:''; var sV=sEl?sEl.innerHTML:'';
+      var d=document.createElement('div');
+      d.setAttribute('data-lst-row', i);
+      d.style.cssText='display:grid;grid-template-columns:4px 1fr 80px 130px;border:1px solid #e8e8e8;border-top:none;';
+      d.innerHTML='<div style="background:#e8e8e8;"></div>'
+        +'<div style="padding:6px 10px;font-size:10.5px;border-right:1px solid #e8e8e8;background:#FFFEF0;min-height:22px;">'+eV+'</div>'
+        +'<div style="padding:6px 4px;font-size:10.5px;border-right:1px solid #e8e8e8;background:#FFFEF0;text-align:center;">'+uV+'</div>'
+        +'<div style="padding:6px 6px;font-size:10.5px;background:#FFFEF0;text-align:center;">'+sV+'</div>';
+      if(obsRow) tbody.insertBefore(d,obsRow); else tbody.appendChild(d);
+    });
+  }
   // poner el clone en el print-sheet y abrir
   var sheet=document.getElementById('print-sheet');
   if(sheet){
@@ -2824,8 +2963,8 @@ function collectData(){
       document.querySelectorAll('[data-key^="'+p+'"]').forEach(function(el){
         xd[el.dataset.key]=el.innerHTML;
       });
-      // badges
-      ['elev-si','elev-no','who-cli','who-rpg'].forEach(function(b){
+      // badges (elevación, quién pone medios, garantía, mantenimiento — todos propios de este albarán)
+      ['elev-si','elev-no','who-cli','who-rpg','gar-si','gar-no','mant-si','mant-no'].forEach(function(b){
         var el=document.getElementById(p+b);
         if(el) xd['_badge_'+p+b]=el.classList.contains('on')?'on':'';
       });
@@ -2938,6 +3077,13 @@ function applyData(payload){
           div.innerHTML=_xAlbFieldsHTML(x.id);
           container.appendChild(div.firstChild);
         }
+        // asegurar filas de la tabla de artículos propia de este albarán antes de rellenar valores
+        var maxRow=0;
+        Object.keys(x).forEach(function(k){
+          var m=k.match(new RegExp('^xalb-'+x.id+'-lst-e(\\d+)$'));
+          if(m){ var n=+m[1]; if(n>maxRow) maxRow=n; }
+        });
+        for(var ri=1;ri<=maxRow;ri++){ _xAlbAddItemRow(x.id, ri); }
         // rellenar campos de texto
         var p='xalb-'+x.id+'-';
         Object.keys(x).forEach(function(k){
@@ -2946,8 +3092,8 @@ function applyData(payload){
           var el=document.querySelector('[data-key="'+k+'"]');
           if(el) el.innerHTML=x[k];
         });
-        // rellenar badges
-        ['elev-si','elev-no','who-cli','who-rpg'].forEach(function(b){
+        // rellenar badges (elevación, quién pone medios, garantía, mantenimiento)
+        ['elev-si','elev-no','who-cli','who-rpg','gar-si','gar-no','mant-si','mant-no'].forEach(function(b){
           var el=document.getElementById(p+b);
           if(el){ el.classList.toggle('on', x['_badge_'+p+b]==='on'); el.classList.toggle('on-no', false); }
         });
